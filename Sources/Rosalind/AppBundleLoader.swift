@@ -32,10 +32,18 @@ struct AppBundleLoader: AppBundleLoading {
     }
 
     func load(_ appBundle: AbsolutePath) async throws -> AppBundle {
-        let infoPlistPath = appBundle.appending(component: "Info.plist")
+        // macOS app bundles store Info.plist inside Contents/,
+        // while iOS/tvOS/watchOS/visionOS bundles store it at the root.
+        let macOSInfoPlistPath = appBundle.appending(components: "Contents", "Info.plist")
+        let flatInfoPlistPath = appBundle.appending(component: "Info.plist")
 
-        if try await !fileSystem.exists(infoPlistPath) {
-            throw AppBundleLoaderError.missingInfoPlist(infoPlistPath)
+        let infoPlistPath: AbsolutePath
+        if try await fileSystem.exists(macOSInfoPlistPath) {
+            infoPlistPath = macOSInfoPlistPath
+        } else if try await fileSystem.exists(flatInfoPlistPath) {
+            infoPlistPath = flatInfoPlistPath
+        } else {
+            throw AppBundleLoaderError.missingInfoPlist(flatInfoPlistPath)
         }
 
         let data = try Data(contentsOf: URL(fileURLWithPath: infoPlistPath.pathString))
